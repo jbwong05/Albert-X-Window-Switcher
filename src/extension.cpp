@@ -18,7 +18,7 @@ using namespace std;
 class XWindowSwitcher::Private {
     public:
         QPointer<ConfigWidget> widget;
-        //Display *display;
+        Display *display;
 };
 
 
@@ -26,19 +26,19 @@ class XWindowSwitcher::Private {
 XWindowSwitcher::Extension::Extension() : Core::Extension("org.albert.extension.xwindowswitcher"), Core::QueryHandler(Core::Plugin::id()), d(new Private) {
     registerQueryHandler(this);
 
-    /*d->display = XOpenDisplay(NULL);
+    d->display = XOpenDisplay(NULL);
     if(d->display == NULL) {
         qDebug() << "Cannot open display";
-    }*/
+    }
 }
 
 
 
 /** ***************************************************************************/
 XWindowSwitcher::Extension::~Extension() {
-    /*if(d->display != NULL) {
+    if(d->display != NULL) {
         XCloseDisplay(d->display);
-    }*/
+    }
 }
 
 

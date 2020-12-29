@@ -1,13 +1,13 @@
 #pragma once
 #include <QObject>
 #include <memory>
-#include <X11/Xlib.h>
 //#include <X11/Xatom.h>
 //#include <X11/cursorfont.h>
 //#include <X11/Xmu/WinUtil.h>
 //#include <glib.h>
 #include "albert/extension.h"
 #include "albert/queryhandler.h"
+//#include <X11/Xlib.h>
 
 namespace XWindowSwitcher {
 
