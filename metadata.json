@@ -1,0 +1,10 @@
+{
+    "id" :              "org.albert.extension.xwindowswitcher",
+    "name" :            "X Window Switcher",
+    "version" :         "1.0",
+    "platform" :        "All",
+    "group" :           "Extensions",
+    "author" :          "Joshua Wong",
+    "dependencies" :    [],
+    "enabledbydefault": false
+}
