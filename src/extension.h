@@ -1,6 +1,11 @@
 #pragma once
 #include <QObject>
 #include <memory>
+#include <X11/Xlib.h>
+//#include <X11/Xatom.h>
+//#include <X11/cursorfont.h>
+//#include <X11/Xmu/WinUtil.h>
+//#include <glib.h>
 #include "albert/extension.h"
 #include "albert/queryhandler.h"
 
@@ -26,6 +31,7 @@ class Private;
         private:
 
             std::unique_ptr<Private> d;
-
+            //Window * getClientList(Display *display, unsigned long *size);
+            //gchar * get_property(Display *disp, Window win, Atom xa_prop_type, gchar *prop_name, unsigned long *size);
     };
 }
