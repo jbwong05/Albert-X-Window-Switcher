@@ -8,7 +8,7 @@ file(GLOB_RECURSE SRC src/* metadata.json)
 
 find_package(Qt5 5.5.0 REQUIRED COMPONENTS Widgets)
 find_package(PkgConfig REQUIRED)
-pkg_check_modules(GTK2 REQUIRED glib-2.0)
+pkg_search_module(GLIB2 REQUIRED glib-2.0)
 
 if(BUILD_SEPARATELY)
     # Find includes in corresponding build directories
@@ -48,13 +48,13 @@ if(BUILD_SEPARATELY)
     endif()
     message(STATUS "xdg library - ${XDG}")
 
-    set(INCLUDE src/ include/)
-    set(LINK_LIBRARIES Qt5::Widgets ${ALBERT} ${XDG} ${GTK2_LIBRARIES})
+    set(INCLUDE src/ include/ ${GLIB2_INCLUDE_DIRS})
+    set(LINK_LIBRARIES Qt5::Widgets ${ALBERT} ${XDG} ${GLIB2_LIBRARIES})
 
 else()
 
-    set(INCLUDE src/)
-    set(LINK_LIBRARIES Qt5::Widgets albert::lib xdg ${GTK2_LIBRARIES})
+    set(INCLUDE src/ ${GLIB2_INCLUDE_DIRS})
+    set(LINK_LIBRARIES Qt5::Widgets albert::lib xdg ${GLIB2_LIBRARIES})
 
 endif()
 

@@ -7,13 +7,15 @@
 #include "configwidget.h"
 #include "extension.h"
 #include <X11/Xlib.h>
-//#include <X11/Xatom.h>
+#include <X11/Xatom.h>
 //#include <X11/cursorfont.h>
 //#include <X11/Xmu/WinUtil.h>
-//#include <glib.h>
+#include <glib.h>
 
 using namespace Core;
 using namespace std;
+
+#define MAX_PROPERTY_VALUE_LEN 4096
 
 class XWindowSwitcher::Private {
     public:
@@ -72,16 +74,20 @@ void XWindowSwitcher::Extension::handleQuery(Core::Query *) const {
     // necessary to make g_get_charset() and g_locale_*() work
     //setlocale(LC_ALL, "");
 
-    /*Window *clientList;
+    Window *clientList;
     unsigned long clientListSize;
 
     if((clientList = getClientList(d->display, &clientListSize)) == NULL) {
         qDebug() << "No windows found";
         return; 
-    }*/
+    }
+
+    qDebug() << "Num windows: " << clientListSize;
+
+    g_free(clientList);
 }
 
-/*Window * XWindowSwitcher::getClientList(Display *display, unsigned long *size) {
+Window * XWindowSwitcher::Extension::getClientList(Display *display, unsigned long *size) const {
     Window *clientList;
 
     if ((clientList = (Window *)get_property(display, DefaultRootWindow(display), 
@@ -94,10 +100,10 @@ void XWindowSwitcher::Extension::handleQuery(Core::Query *) const {
     }
 
     return clientList;
-}*/
+}
 
-/*gchar * XWindowSwitcher::get_property(Display *disp, Window win,
-        Atom xa_prop_type, gchar *prop_name, unsigned long *size) {
+gchar * XWindowSwitcher::Extension::get_property(Display *disp, Window win,
+        Atom xa_prop_type, gchar *prop_name, unsigned long *size) const {
     Atom xa_prop_name;
     Atom xa_ret_type;
     int ret_format;
@@ -113,7 +119,7 @@ void XWindowSwitcher::Extension::handleQuery(Core::Query *) const {
      *
      * long_length = Specifies the length in 32-bit multiples of the
      *               data to be retrieved.
-     *
+     */
     if(XGetWindowProperty(disp, win, xa_prop_name, 0, MAX_PROPERTY_VALUE_LEN / 4, False,
             xa_prop_type, &xa_ret_type, &ret_format,     
             &ret_nitems, &ret_bytes_after, &ret_prop) != Success) {
@@ -127,9 +133,9 @@ void XWindowSwitcher::Extension::handleQuery(Core::Query *) const {
         return NULL;
     }
 
-    /* null terminate the result to make string handling easier 
+    // null terminate the result to make string handling easier 
     tmp_size = (ret_format / 8) * ret_nitems;
-    ret = g_malloc(tmp_size + 1);
+    ret = (gchar *)g_malloc(tmp_size + 1);
     memcpy(ret, ret_prop, tmp_size);
     ret[tmp_size] = '\0';
 
@@ -139,4 +145,4 @@ void XWindowSwitcher::Extension::handleQuery(Core::Query *) const {
     
     XFree(ret_prop);
     return ret;
-}*/
+}
