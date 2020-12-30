@@ -83,6 +83,11 @@ void XWindowSwitcher::Extension::handleQuery(Core::Query *) const {
     }
 
     qDebug() << "Num windows: " << clientListSize;
+    for(long unsigned int i = 0; i < clientListSize / sizeof(Window); i++) {
+        gchar *title_utf8 = get_window_title(d->display, clientList[i]);
+        qDebug() << title_utf8;
+        g_free(title_utf8);
+    }
 
     g_free(clientList);
 }
@@ -135,6 +140,10 @@ gchar * XWindowSwitcher::Extension::get_property(Display *disp, Window win,
 
     // null terminate the result to make string handling easier 
     tmp_size = (ret_format / 8) * ret_nitems;
+    /* Correct 64 Architecture implementation of 32 bit data */
+    if(ret_format==32) {
+        tmp_size *= sizeof(long) / 4;
+    }
     ret = (gchar *)g_malloc(tmp_size + 1);
     memcpy(ret, ret_prop, tmp_size);
     ret[tmp_size] = '\0';
@@ -145,4 +154,31 @@ gchar * XWindowSwitcher::Extension::get_property(Display *disp, Window win,
     
     XFree(ret_prop);
     return ret;
+}
+
+gchar * XWindowSwitcher::Extension::get_window_title (Display *disp, Window win) const {
+    gchar *title_utf8;
+    gchar *wm_name;
+    gchar *net_wm_name;
+
+    wm_name = get_property(disp, win, XA_STRING, "WM_NAME", NULL);
+    net_wm_name = get_property(disp, win, 
+            XInternAtom(disp, "UTF8_STRING", False), "_NET_WM_NAME", NULL);
+
+    if (net_wm_name) {
+        title_utf8 = g_strdup(net_wm_name);
+    }
+    else {
+        if (wm_name) {
+            title_utf8 = g_locale_to_utf8(wm_name, -1, NULL, NULL, NULL);
+        }
+        else {
+            title_utf8 = NULL;
+        }
+    }
+
+    g_free(wm_name);
+    g_free(net_wm_name);
+    
+    return title_utf8;
 }

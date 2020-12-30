@@ -36,5 +36,6 @@ class Private;
             std::unique_ptr<Private> d;
             Window * getClientList(Display *display, unsigned long *size) const;
             gchar * get_property(Display *disp, Window win, Atom xa_prop_type, gchar *prop_name, unsigned long *size) const;
+            gchar * get_window_title(Display *disp, Window win) const;
     };
 }
