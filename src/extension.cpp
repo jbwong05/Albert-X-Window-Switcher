@@ -8,14 +8,13 @@
 #include "extension.h"
 #include <X11/Xlib.h>
 #include <X11/Xatom.h>
-//#include <X11/cursorfont.h>
-//#include <X11/Xmu/WinUtil.h>
 #include <glib.h>
 
 using namespace Core;
 using namespace std;
 
 #define MAX_PROPERTY_VALUE_LEN 4096
+#define FALLBACK_ICON "preferences-system"
 
 class XWindowSwitcher::Private {
     public:
@@ -71,45 +70,45 @@ void XWindowSwitcher::Extension::teardownSession() {
 
 /** ***************************************************************************/
 void XWindowSwitcher::Extension::handleQuery(Core::Query *query) const {
-    // necessary to make g_get_charset() and g_locale_*() work
-    //setlocale(LC_ALL, "");
 
-    if(query->string().isEmpty()) {
-        return;
-    }
+    if(d->display != NULL) {
 
-    Window *clientList;
-    unsigned long clientListSize;
-
-    if((clientList = getClientList(d->display, &clientListSize)) == NULL) {
-        qDebug() << "No windows found";
-        return; 
-    }
-
-    clientListSize /= sizeof(Window);
-    qDebug() << "Num windows: " << clientListSize;
-    for(long unsigned int i = 0; i < clientListSize; i++) {
-        gchar *title_utf8 = get_window_title(d->display, clientList[i]);
-        QString windowTitle(title_utf8);
-        g_free(title_utf8);
-
-        //qDebug() << "Checking " << windowTitle;
-        if(windowTitle.contains(query->string())) {
-            qDebug() << "Match found";
-            //int score = static_cast<uint>(static_cast<float>(query->string().size()) / windowTitle.size() * UINT_MAX);
-
-            auto item = make_shared<StandardItem>("Switch to window");
-            item->setText("Switch to window");
-            item->setSubtext(windowTitle);
-
-            QString iconPath = XDG::IconLookup::iconPath("system-preferences");
-            item->setIconPath(iconPath);
-            item->addAction(make_shared<ActivateWindowAction>(windowTitle, d->display, clientList[i]));
-            query->addMatch(std::move(item), 0);
+        if(query->string().isEmpty() || query->string().length() <= 3) {
+            return;
         }
-    }
 
-    g_free(clientList);
+        Window *clientList;
+        unsigned long clientListSize;
+
+        if((clientList = getClientList(d->display, &clientListSize)) == NULL) {
+            qDebug() << "No windows found";
+            return; 
+        }
+
+        clientListSize /= sizeof(Window);
+        for(long unsigned int i = 0; i < clientListSize; i++) {
+            gchar *title_utf8 = get_window_title(d->display, clientList[i]);
+            QString windowTitle(title_utf8);
+            g_free(title_utf8);
+
+            XClassHint classHint;
+            XGetClassHint(d->display, clientList[i], &classHint);
+            QString applicationName(classHint.res_name);
+            qDebug() << "Checking " << applicationName;
+            if(applicationName.contains(query->string()) || windowTitle.contains(query->string())) {
+                auto item = make_shared<StandardItem>(applicationName);
+                item->setText(applicationName);
+                item->setSubtext(windowTitle);
+
+                QString iconPath = XDG::IconLookup::iconPath(FALLBACK_ICON);
+                item->setIconPath(iconPath);
+                item->addAction(make_shared<ActivateWindowAction>(applicationName, d->display, clientList[i]));
+                query->addMatch(std::move(item), 0);
+            }
+        }
+
+        g_free(clientList);
+    }
 }
 
 Window * XWindowSwitcher::Extension::getClientList(Display *display, unsigned long *size) const {

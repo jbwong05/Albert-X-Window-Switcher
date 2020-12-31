@@ -5,6 +5,7 @@
 #include "albert/queryhandler.h"
 #include "albert/util/standardactions.h"
 #include <X11/Xlib.h>
+#include <X11/Xutil.h>
 #include <glib.h>
 
 #undef Bool
