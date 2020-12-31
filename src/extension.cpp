@@ -20,6 +20,8 @@ class XWindowSwitcher::Private {
     public:
         QPointer<ConfigWidget> widget;
         Display *display;
+        QMap<QString, QString> iconPaths;
+        QString fallbackIconPath;
 };
 
 
@@ -27,9 +29,35 @@ class XWindowSwitcher::Private {
 XWindowSwitcher::Extension::Extension() : Core::Extension("org.albert.extension.xwindowswitcher"), Core::QueryHandler(Core::Plugin::id()), d(new Private) {
     registerQueryHandler(this);
 
+    d->fallbackIconPath = XDG::IconLookup::iconPath(FALLBACK_ICON);
+
     d->display = XOpenDisplay(NULL);
     if(d->display == NULL) {
         qDebug() << "Cannot open display";
+
+    } else {
+        Window *clientList;
+        unsigned long clientListSize;
+
+        if((clientList = getClientList(d->display, &clientListSize)) == NULL) {
+            qDebug() << "No windows found";
+            return; 
+        }
+
+        clientListSize /= sizeof(Window);
+        for(long unsigned int i = 0; i < clientListSize; i++) {
+            XClassHint classHint;
+            XGetClassHint(d->display, clientList[i], &classHint);
+            QString applicationName(classHint.res_name);
+
+            QString path = XDG::IconLookup::iconPath(classHint.res_name);
+            if(path.isEmpty()) {
+                qDebug() << "No icon for " << applicationName << "found";
+                d->iconPaths.insert(applicationName, d->fallbackIconPath);
+            } else {
+                d->iconPaths.insert(applicationName, path);
+            }
+        }
     }
 }
 
@@ -73,7 +101,7 @@ void XWindowSwitcher::Extension::handleQuery(Core::Query *query) const {
 
     if(d->display != NULL) {
 
-        if(query->string().isEmpty() || query->string().length() <= 3) {
+        if(query->string().isEmpty() || query->string().length() <= 1) {
             return;
         }
 
@@ -94,13 +122,24 @@ void XWindowSwitcher::Extension::handleQuery(Core::Query *query) const {
             XClassHint classHint;
             XGetClassHint(d->display, clientList[i], &classHint);
             QString applicationName(classHint.res_name);
-            qDebug() << "Checking " << applicationName;
             if(applicationName.contains(query->string()) || windowTitle.contains(query->string())) {
                 auto item = make_shared<StandardItem>(applicationName);
-                item->setText(applicationName);
+                item->setText("Switch Windows");
                 item->setSubtext(windowTitle);
 
-                QString iconPath = XDG::IconLookup::iconPath(FALLBACK_ICON);
+                QString iconPath;
+                if(d->iconPaths.contains(applicationName)) {
+                    iconPath = d->iconPaths[applicationName];
+                } else {
+                    iconPath = XDG::IconLookup::iconPath(applicationName);
+
+                    if(iconPath.isEmpty()) {
+                        d->iconPaths.insert(applicationName, d->fallbackIconPath);
+                    } else {
+                        d->iconPaths.insert(applicationName, iconPath);
+                    }
+                }
+
                 item->setIconPath(iconPath);
                 item->addAction(make_shared<ActivateWindowAction>(applicationName, d->display, clientList[i]));
                 query->addMatch(std::move(item), 0);
