@@ -1,6 +1,5 @@
 #include <QDebug>
 #include <QPointer>
-#include <QDebug>
 #include <stdexcept>
 #include "albert/util/standarditem.h"
 #include "xdg/iconlookup.h"
