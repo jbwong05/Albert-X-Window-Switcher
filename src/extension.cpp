@@ -252,7 +252,8 @@ void XWindowSwitcher::ActivateWindowAction::activate() {
         char netActiveWindow[] = "_NET_ACTIVE_WINDOW";
         client_msg(netActiveWindow);
         XMapRaised(display, window);
-        XFlush(display);
+        XSetInputFocus(display, window, RevertToNone, CurrentTime);
+        XSync(display, false);
     }
 }
 
