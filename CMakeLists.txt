@@ -6,7 +6,7 @@ option(BUILD_SEPARATELY "Build separately from Albert" OFF)
 
 file(GLOB_RECURSE SRC src/* metadata.json)
 
-find_package(Qt5 5.5.0 REQUIRED COMPONENTS Widgets)
+find_package(Qt5 5.5.0 REQUIRED COMPONENTS Widgets Concurrent)
 
 if(BUILD_SEPARATELY)
     # Find includes in corresponding build directories
@@ -47,12 +47,12 @@ if(BUILD_SEPARATELY)
     message(STATUS "xdg library - ${XDG}")
 
     set(INCLUDE src/ include/ ${GLIB2_INCLUDE_DIRS})
-    set(LINK_LIBRARIES Qt5::Widgets ${ALBERT} ${XDG})
+    set(LINK_LIBRARIES Qt5::Widgets Qt5::Concurrent ${ALBERT} ${XDG})
 
 else()
 
     set(INCLUDE src/ ${GLIB2_INCLUDE_DIRS})
-    set(LINK_LIBRARIES Qt5::Widgets albert::lib xdg)
+    set(LINK_LIBRARIES Qt5::Widgets Qt5::Concurrent albert::lib xdg)
 
 endif()
 

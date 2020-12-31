@@ -1,5 +1,8 @@
 #include <QDebug>
 #include <QPointer>
+#include <QFileSystemWatcher>
+#include <QFutureWatcher>
+#include <QtConcurrent>
 #include <stdexcept>
 #include "albert/util/standarditem.h"
 #include "xdg/iconlookup.h"
@@ -17,8 +20,190 @@ class XWindowSwitcher::Private {
         QPointer<ConfigWidget> widget;
         Display *display;
         QMap<QString, QString> iconPaths;
+        QMap<QString, QString> index;
         QString fallbackIconPath;
+
+        QFileSystemWatcher watcher;
+        QFutureWatcher<QMap<QString, QString>> futureWatcher;
+        bool rerun = false;
+
+        void startIndexing();
+        void finishIndexing();
+        QMap<QString, QString> indexApplications() const;
 };
+
+void XWindowSwitcher::Private::startIndexing() {
+    // Never run concurrent
+    if(futureWatcher.future().isRunning()) {
+        rerun = true;
+        return;
+    }
+
+    // Run finishIndexing when the indexing thread finished
+    futureWatcher.disconnect();
+    QObject::connect(&futureWatcher, &QFutureWatcher<QMap<QString, QString>>::finished,
+        std::bind(&Private::finishIndexing, this));
+
+    // Run the indexer thread
+    futureWatcher.setFuture(QtConcurrent::run(this, &Private::indexApplications));
+}
+
+void XWindowSwitcher::Private::finishIndexing() {
+    // Get the thread results
+    index = futureWatcher.future().result();
+
+    // Rebuild
+    iconPaths.clear();
+    for(auto key : index.keys()) {
+        iconPaths.insert(key, index.value(key));
+    }
+
+    // Finally update the watches (maybe folders changed)
+    if (!watcher.directories().isEmpty()) {
+        watcher.removePaths(watcher.directories());
+    } 
+    QStringList xdgAppDirs = QStandardPaths::standardLocations(QStandardPaths::ApplicationsLocation);
+    for(const QString &path : xdgAppDirs) {
+        if(QFile::exists(path)) {
+            watcher.addPath(path);
+            QDirIterator dit(path, QDir::Dirs|QDir::NoDotAndDotDot);
+            while (dit.hasNext()) {
+                watcher.addPath(dit.next());
+            }
+        }
+    }
+
+    if (rerun) {
+        startIndexing();
+        rerun = false;
+    }
+}
+
+QMap<QString, QString> XWindowSwitcher::Private::indexApplications() const {
+    QMap<QString, QString> retrievedIconPaths;
+    QStringList xdg_current_desktop = QString(getenv("XDG_CURRENT_DESKTOP")).split(':',QString::SkipEmptyParts);
+    QLocale loc;
+    QStringList xdgAppDirs = QStandardPaths::standardLocations(QStandardPaths::ApplicationsLocation);
+
+    /*
+     * Create a list of desktop files to index (unique ids)
+     * To determine the ID of a desktop file, make its full path relative to
+     * the $XDG_DATA_DIRS component in which the desktop file is installed,
+     * remove the "applications/" prefix, and turn '/' into '-'.
+     */
+
+    map<QString /*desktop file id*/, QString /*path*/> desktopFiles;
+    for (const QString &dir : xdgAppDirs ) {
+        QDirIterator fIt(dir, QStringList("*.desktop"), QDir::Files,
+                         QDirIterator::Subdirectories | QDirIterator::FollowSymlinks);
+        while(!fIt.next().isEmpty()) {
+            QString desktopFileId = fIt.filePath().remove(QRegularExpression("^.*applications/")).replace("/", "-");
+            desktopFiles.emplace(desktopFileId, fIt.filePath());
+        }
+    }
+
+    // Iterate over all desktop files
+    for (const auto &id_path_pair : desktopFiles) {
+        const QString &path = id_path_pair.second;
+
+        QString executable;
+        QString iconPath;
+        QString startupWMClass;
+        bool desktopEntry = false;
+        bool applicationType = false;
+        bool noDisplay = false;
+
+        /*
+         * Get the data from the desktop file
+         */
+
+        // Read the file into a map
+        {
+            QFile file(path);
+            if(!file.open(QIODevice::ReadOnly | QIODevice::Text)) 
+                continue;
+            QTextStream stream(&file);
+            for(QString line = stream.readLine(); !line.isNull(); line = stream.readLine()) {
+                line = line.trimmed();
+
+                if(!desktopEntry && line.contains("Desktop Entry")) {
+                    desktopEntry = true;
+                }
+
+                if(!applicationType && line.startsWith("Type=Application")) {
+                    applicationType = true;
+                }
+
+                if(!noDisplay && line.startsWith("NoDisplay=true")) {
+                    noDisplay = true;
+                }
+
+                if(line.startsWith("Exec")) {
+                    int index = line.indexOf("=");
+                    if(index != -1) {
+                        executable = line.mid(index + 1);
+                    }
+
+                } else if(line.startsWith("Icon")) {
+                    int index = line.indexOf("=");
+                    if(index != -1) {
+                        iconPath = line.mid(index + 1);
+                    }
+
+                } else if(line.startsWith("StartupWMClass")) {
+                    int index = line.indexOf("=");
+                    if(index != -1) {
+                        startupWMClass = line.mid(index + 1);
+                    }
+                }
+            }
+            file.close();
+        }
+
+        if(!desktopEntry || !applicationType || noDisplay) {
+            continue;
+        }
+
+        if(!executable.isNull() && !iconPath.isNull()) {
+
+            if(startupWMClass.isEmpty()) {
+
+                int lastSlashIndex = executable.lastIndexOf("/");
+                int index = executable.indexOf(' ', lastSlashIndex + 1);
+                if(index != -1) {
+                    executable = executable.mid(0, index);
+                }
+
+                index = executable.lastIndexOf("/");
+                if(index != -1) {
+                    executable = executable.mid(index + 1);
+                }
+
+                index = executable.indexOf("\"");
+                while(index != -1) {
+                    executable = executable.replace(index, 2, ""); 
+                    index = executable.indexOf("\"");
+                }
+
+            } else {
+                executable = startupWMClass.toLower();
+            }
+
+            if(!iconPath.contains("/")) {
+                iconPath = XDG::IconLookup::iconPath(iconPath);
+                if(iconPath.isNull()) {
+                    iconPath = fallbackIconPath;
+                }
+            }
+
+            if(!executable.isEmpty() && !iconPath.isEmpty()) {
+                retrievedIconPaths.insert(executable, iconPath);
+            }
+        }
+    }
+
+    return retrievedIconPaths;
+}
 
 
 /** ***************************************************************************/
@@ -32,28 +217,10 @@ XWindowSwitcher::Extension::Extension() : Core::Extension("org.albert.extension.
         qDebug() << "Cannot open display";
 
     } else {
-        Window *clientList;
-        unsigned long clientListSize;
 
-        if((clientList = getClientList(d->display, &clientListSize)) == NULL) {
-            qDebug() << "No windows found";
-            return; 
-        }
-
-        clientListSize /= sizeof(Window);
-        for(long unsigned int i = 0; i < clientListSize; i++) {
-            XClassHint classHint;
-            XGetClassHint(d->display, clientList[i], &classHint);
-            QString applicationName(classHint.res_name);
-
-            QString path = XDG::IconLookup::iconPath(classHint.res_name);
-            if(path.isEmpty()) {
-                qDebug() << "No icon for " << applicationName << "found";
-                d->iconPaths.insert(applicationName, d->fallbackIconPath);
-            } else {
-                d->iconPaths.insert(applicationName, path);
-            }
-        }
+        // If the filesystem changed, trigger the scan
+        connect(&d->watcher, &QFileSystemWatcher::directoryChanged, std::bind(&Private::startIndexing, d.get()));
+        d->startIndexing();
     }
 }
 
@@ -129,15 +296,15 @@ void XWindowSwitcher::Extension::handleQuery(Core::Query *query) const {
                 item->setSubtext(windowTitle);
 
                 QString iconPath;
-                if(d->iconPaths.contains(applicationName)) {
+                if(d->iconPaths.contains(applicationName.toLower())) {
                     iconPath = d->iconPaths[applicationName];
                 } else {
                     iconPath = XDG::IconLookup::iconPath(applicationName);
 
                     if(iconPath.isEmpty()) {
-                        d->iconPaths.insert(applicationName, d->fallbackIconPath);
+                        d->iconPaths.insert(applicationName.toLower(), d->fallbackIconPath);
                     } else {
-                        d->iconPaths.insert(applicationName, iconPath);
+                        d->iconPaths.insert(applicationName.toLower(), iconPath);
                     }
                 }
 
