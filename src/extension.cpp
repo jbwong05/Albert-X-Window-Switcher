@@ -111,9 +111,14 @@ void XWindowSwitcher::Extension::handleQuery(Core::Query *query) const {
 
         clientListSize /= sizeof(Window);
         for(long unsigned int i = 0; i < clientListSize; i++) {
-            gchar *title_utf8 = get_window_title(d->display, clientList[i]);
+            char *title_utf8 = get_window_title(d->display, clientList[i]);
             QString windowTitle(title_utf8);
-            g_free(title_utf8);
+
+            if(title_utf8 != NULL) {
+                free(title_utf8);
+            } else {
+                windowTitle = "";
+            }
 
             XClassHint classHint;
             XGetClassHint(d->display, clientList[i], &classHint);
@@ -142,7 +147,9 @@ void XWindowSwitcher::Extension::handleQuery(Core::Query *query) const {
             }
         }
 
-        g_free(clientList);
+        if(clientList != NULL) {
+            free(clientList);
+        }
     }
 }
 
@@ -158,8 +165,8 @@ Window * XWindowSwitcher::Extension::getClientList(Display *display, unsigned lo
     return clientList;
 }
 
-gchar * XWindowSwitcher::Extension::get_property(Display *disp, Window win,
-        Atom xa_prop_type, gchar *prop_name, unsigned long *size) const {
+char * XWindowSwitcher::Extension::get_property(Display *disp, Window win,
+        Atom xa_prop_type, char *prop_name, unsigned long *size) const {
     Atom xa_prop_name;
     Atom xa_ret_type;
     int ret_format;
@@ -167,7 +174,7 @@ gchar * XWindowSwitcher::Extension::get_property(Display *disp, Window win,
     unsigned long ret_bytes_after;
     unsigned long tmp_size;
     unsigned char *ret_prop;
-    gchar *ret;
+    char *ret;
     
     xa_prop_name = XInternAtom(disp, prop_name, False);
     
@@ -193,7 +200,12 @@ gchar * XWindowSwitcher::Extension::get_property(Display *disp, Window win,
     if(ret_format==32) {
         tmp_size *= sizeof(long) / 4;
     }
-    ret = (gchar *)g_malloc(tmp_size + 1);
+    ret = (char *)malloc(tmp_size + 1);
+
+    if(ret == NULL) {
+        return NULL;
+    }
+
     memcpy(ret, ret_prop, tmp_size);
     ret[tmp_size] = '\0';
 
@@ -205,34 +217,29 @@ gchar * XWindowSwitcher::Extension::get_property(Display *disp, Window win,
     return ret;
 }
 
-gchar * XWindowSwitcher::Extension::get_window_title (Display *disp, Window win) const {
-    gchar *title_utf8;
-    gchar *wm_name;
-    gchar *net_wm_name;
-    char wmName[] = "WM_NAME";
+char * XWindowSwitcher::Extension::get_window_title(Display *disp, Window win) const {
+    char *title;
+    char *net_wm_name;
     char utf8[] = "UTF8_STRING";
     char netWMName[] = "_NET_WM_NAME";
-
-    wm_name = get_property(disp, win, XA_STRING, wmName, NULL);
-    net_wm_name = get_property(disp, win, 
-            XInternAtom(disp, utf8, False), netWMName, NULL);
+  
+    net_wm_name = get_property(disp, win, XInternAtom(disp, utf8, False), netWMName, NULL);
 
     if (net_wm_name) {
-        title_utf8 = g_strdup(net_wm_name);
-    }
-    else {
-        if (wm_name) {
-            title_utf8 = g_locale_to_utf8(wm_name, -1, NULL, NULL, NULL);
-        }
-        else {
-            title_utf8 = NULL;
-        }
-    }
+        title = strdup(net_wm_name);
+        free(net_wm_name);
+        return title;
 
-    g_free(wm_name);
-    g_free(net_wm_name);
-    
-    return title_utf8;
+    } else {
+        XTextProperty textProperty;
+        if(XGetWMName(disp, win, &textProperty)) {
+            char *converted = reinterpret_cast<char*>(textProperty.value);
+            title = strdup(converted);
+            return title;
+        } else {
+            return NULL;
+        }
+    }
 }
 
 XWindowSwitcher::ActivateWindowAction::ActivateWindowAction(const QString &text, Display *display, Window window)

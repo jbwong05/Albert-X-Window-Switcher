@@ -9,7 +9,6 @@
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <X11/Xatom.h>
-#include <glib.h>
 
 // Need to undef Bool because Qt headers redefine it
 #undef Bool
@@ -37,8 +36,8 @@ namespace XWindowSwitcher {
 
             std::unique_ptr<Private> d;
             Window * getClientList(Display *display, unsigned long *size) const;
-            gchar * get_property(Display *disp, Window win, Atom xa_prop_type, gchar *prop_name, unsigned long *size) const;
-            gchar * get_window_title(Display *disp, Window win) const;
+            char * get_property(Display *disp, Window win, Atom xa_prop_type, char *prop_name, unsigned long *size) const;
+            char * get_window_title(Display *disp, Window win) const;
     };
 
     struct ActivateWindowAction : public Core::StandardActionBase {
