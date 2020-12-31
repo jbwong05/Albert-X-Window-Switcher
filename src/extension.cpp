@@ -148,9 +148,10 @@ void XWindowSwitcher::Extension::handleQuery(Core::Query *query) const {
 
 Window * XWindowSwitcher::Extension::getClientList(Display *display, unsigned long *size) const {
     Window *clientList;
+    char netClientList[] = "_NET_CLIENT_LIST";
 
     if ((clientList = (Window *)get_property(display, DefaultRootWindow(display), 
-                    XA_WINDOW, "_NET_CLIENT_LIST", size)) == NULL) {
+                    XA_WINDOW, netClientList, size)) == NULL) {
         return NULL;
     }
 
@@ -208,10 +209,13 @@ gchar * XWindowSwitcher::Extension::get_window_title (Display *disp, Window win)
     gchar *title_utf8;
     gchar *wm_name;
     gchar *net_wm_name;
+    char wmName[] = "WM_NAME";
+    char utf8[] = "UTF8_STRING";
+    char netWMName[] = "_NET_WM_NAME";
 
-    wm_name = get_property(disp, win, XA_STRING, "WM_NAME", NULL);
+    wm_name = get_property(disp, win, XA_STRING, wmName, NULL);
     net_wm_name = get_property(disp, win, 
-            XInternAtom(disp, "UTF8_STRING", False), "_NET_WM_NAME", NULL);
+            XInternAtom(disp, utf8, False), netWMName, NULL);
 
     if (net_wm_name) {
         title_utf8 = g_strdup(net_wm_name);
@@ -238,7 +242,8 @@ XWindowSwitcher::ActivateWindowAction::ActivateWindowAction(const QString &text,
 
 void XWindowSwitcher::ActivateWindowAction::activate() {
     if(display != NULL) {
-        client_msg("_NET_ACTIVE_WINDOW");
+        char netActiveWindow[] = "_NET_ACTIVE_WINDOW";
+        client_msg(netActiveWindow);
         XMapRaised(display, window);
         XFlush(display);
     }
