@@ -3,6 +3,9 @@
 ## Description
 QPlugin for the [Albert Launcher](https://albertlauncher.github.io/) that allows Albert to switch to open windows. This utility is designed for systems that use the X11 window system. As of the time that this was written, this functionality does exist in Albert via a python wrapper for the [wmctrl](https://github.com/Conservatory/wmctrl) utility, however this implementation aims to have better performance as it removes any of the added overhead of python and pybind11 because the functionality is implemented natively.
 
+## Dependencies
+This plugin also shares the same dependencies that are needed to build [Albert](https://albertlauncher.github.io/) from sources. Information about building [Albert](https://albertlauncher.github.io/) from sources and its dependencies can be found [here](https://albertlauncher.github.io/docs/installing/).
+
 ## Installation
 
 ### Option 1: Compile alongside Albert
