@@ -70,9 +70,13 @@ void XWindowSwitcher::Extension::teardownSession() {
 
 
 /** ***************************************************************************/
-void XWindowSwitcher::Extension::handleQuery(Core::Query *) const {
+void XWindowSwitcher::Extension::handleQuery(Core::Query *query) const {
     // necessary to make g_get_charset() and g_locale_*() work
     //setlocale(LC_ALL, "");
+
+    if(query->string().isEmpty()) {
+        return;
+    }
 
     Window *clientList;
     unsigned long clientListSize;
@@ -82,11 +86,27 @@ void XWindowSwitcher::Extension::handleQuery(Core::Query *) const {
         return; 
     }
 
+    clientListSize /= sizeof(Window);
     qDebug() << "Num windows: " << clientListSize;
-    for(long unsigned int i = 0; i < clientListSize / sizeof(Window); i++) {
+    for(long unsigned int i = 0; i < clientListSize; i++) {
         gchar *title_utf8 = get_window_title(d->display, clientList[i]);
-        qDebug() << title_utf8;
+        QString windowTitle(title_utf8);
         g_free(title_utf8);
+
+        //qDebug() << "Checking " << windowTitle;
+        if(windowTitle.contains(query->string())) {
+            qDebug() << "Match found";
+            //int score = static_cast<uint>(static_cast<float>(query->string().size()) / windowTitle.size() * UINT_MAX);
+
+            auto item = make_shared<StandardItem>("Switch to window");
+            item->setText("Switch to window");
+            item->setSubtext(windowTitle);
+
+            QString iconPath = XDG::IconLookup::iconPath("system-preferences");
+            item->setIconPath(iconPath);
+            item->addAction(make_shared<ActivateWindowAction>(windowTitle, d->display, clientList[i]));
+            query->addMatch(std::move(item), 0);
+        }
     }
 
     g_free(clientList);
@@ -97,11 +117,7 @@ Window * XWindowSwitcher::Extension::getClientList(Display *display, unsigned lo
 
     if ((clientList = (Window *)get_property(display, DefaultRootWindow(display), 
                     XA_WINDOW, "_NET_CLIENT_LIST", size)) == NULL) {
-        if ((clientList = (Window *)get_property(display, DefaultRootWindow(display), 
-                        XA_CARDINAL, "_WIN_CLIENT_LIST", size)) == NULL) {
-            qDebug() << "Cannot get client list properties";
-            return NULL;
-        }
+        return NULL;
     }
 
     return clientList;
@@ -128,19 +144,17 @@ gchar * XWindowSwitcher::Extension::get_property(Display *disp, Window win,
     if(XGetWindowProperty(disp, win, xa_prop_name, 0, MAX_PROPERTY_VALUE_LEN / 4, False,
             xa_prop_type, &xa_ret_type, &ret_format,     
             &ret_nitems, &ret_bytes_after, &ret_prop) != Success) {
-        qDebug() << "Cannot get " << prop_name << " property";
         return NULL;
     }
   
     if(xa_ret_type != xa_prop_type) {
-        qDebug() << "Invalid type of " << prop_name << " property";
         XFree(ret_prop);
         return NULL;
     }
 
     // null terminate the result to make string handling easier 
     tmp_size = (ret_format / 8) * ret_nitems;
-    /* Correct 64 Architecture implementation of 32 bit data */
+    // Correct 64 Architecture implementation of 32 bit data
     if(ret_format==32) {
         tmp_size *= sizeof(long) / 4;
     }
@@ -181,4 +195,36 @@ gchar * XWindowSwitcher::Extension::get_window_title (Display *disp, Window win)
     g_free(net_wm_name);
     
     return title_utf8;
+}
+
+XWindowSwitcher::ActivateWindowAction::ActivateWindowAction(const QString &text, Display *display, Window window)
+    : StandardActionBase(text), display(display), window(window) {
+
+}
+
+void XWindowSwitcher::ActivateWindowAction::activate() {
+    if(display != NULL) {
+        client_msg("_NET_ACTIVE_WINDOW");
+        XMapRaised(display, window);
+        XFlush(display);
+    }
+}
+
+void XWindowSwitcher::ActivateWindowAction::client_msg(char *msg) {
+    XEvent event;
+    long mask = SubstructureRedirectMask | SubstructureNotifyMask;
+
+    event.xclient.type = ClientMessage;
+    event.xclient.serial = 0;
+    event.xclient.send_event = True;
+    event.xclient.message_type = XInternAtom(display, msg, False);
+    event.xclient.window = window;
+    event.xclient.format = 32;
+    event.xclient.data.l[0] = 0;
+    event.xclient.data.l[1] = 0;
+    event.xclient.data.l[2] = 0;
+    event.xclient.data.l[3] = 0;
+    event.xclient.data.l[4] = 0;
+
+    XSendEvent(display, DefaultRootWindow(display), False, mask, &event);
 }

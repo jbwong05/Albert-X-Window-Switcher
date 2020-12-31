@@ -1,12 +1,9 @@
 #pragma once
 #include <QObject>
 #include <memory>
-//#include <X11/Xatom.h>
-//#include <X11/cursorfont.h>
-//#include <X11/Xmu/WinUtil.h>
-
 #include "albert/extension.h"
 #include "albert/queryhandler.h"
+#include "albert/util/standardactions.h"
 #include <X11/Xlib.h>
 #include <glib.h>
 
@@ -14,7 +11,7 @@
 
 namespace XWindowSwitcher {
 
-class Private;
+    class Private;
 
     class Extension final : public Core::Extension, public Core::QueryHandler {
         Q_OBJECT
@@ -37,5 +34,17 @@ class Private;
             Window * getClientList(Display *display, unsigned long *size) const;
             gchar * get_property(Display *disp, Window win, Atom xa_prop_type, gchar *prop_name, unsigned long *size) const;
             gchar * get_window_title(Display *disp, Window win) const;
+    };
+
+    struct ActivateWindowAction : public Core::StandardActionBase {
+        public:
+            ActivateWindowAction(const QString &text, Display *display, Window window);
+            void activate() override;
+
+        private:
+            Display *display;
+            Window window;
+            
+            void client_msg(char *msg);
     };
 }
