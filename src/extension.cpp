@@ -5,9 +5,6 @@
 #include "xdg/iconlookup.h"
 #include "configwidget.h"
 #include "extension.h"
-#include <X11/Xlib.h>
-#include <X11/Xatom.h>
-#include <glib.h>
 
 using namespace Core;
 using namespace std;

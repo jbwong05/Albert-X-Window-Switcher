@@ -4,10 +4,14 @@
 #include "albert/extension.h"
 #include "albert/queryhandler.h"
 #include "albert/util/standardactions.h"
+
+// X11 headers must be included before Qt headers in cpp file
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
+#include <X11/Xatom.h>
 #include <glib.h>
 
+// Need to undef Bool because Qt headers redefine it
 #undef Bool
 
 namespace XWindowSwitcher {
