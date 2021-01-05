@@ -291,6 +291,9 @@ void XWindowSwitcher::Extension::handleQuery(Core::Query *query) const {
             XGetClassHint(d->display, clientList[i], &classHint);
             QString applicationName(classHint.res_name);
             if(applicationName.toLower().contains(query->string().toLower()) || windowTitle.toLower().contains(query->string().toLower())) {
+                
+                unsigned long *desktopId = (unsigned long *)get_property(d->display, clientList[i], XA_CARDINAL, "_NET_WM_DESKTOP", NULL);
+
                 auto item = make_shared<StandardItem>(applicationName);
                 item->setText("Switch Windows");
                 item->setSubtext(windowTitle);
@@ -309,7 +312,12 @@ void XWindowSwitcher::Extension::handleQuery(Core::Query *query) const {
                 }
 
                 item->setIconPath(iconPath);
-                item->addAction(make_shared<ActivateWindowAction>(applicationName, d->display, clientList[i]));
+                if(desktopId != NULL) {
+                    item->addAction(make_shared<ActivateWindowAction>(applicationName, d->display, clientList[i], true, *desktopId));
+                    free(desktopId);
+                } else {
+                    item->addAction(make_shared<ActivateWindowAction>(applicationName, d->display, clientList[i], false));
+                }
                 query->addMatch(std::move(item), 0);
             }
         }
@@ -409,22 +417,30 @@ char * XWindowSwitcher::Extension::get_window_title(Display *disp, Window win) c
     }
 }
 
-XWindowSwitcher::ActivateWindowAction::ActivateWindowAction(const QString &text, Display *display, Window window)
-    : StandardActionBase(text), display(display), window(window) {
+XWindowSwitcher::ActivateWindowAction::ActivateWindowAction(const QString &text, Display *display, Window window, bool validDesktopId, unsigned long desktopId)
+    : StandardActionBase(text), display(display), window(window), validDesktopId(validDesktopId), desktopId(desktopId) {
 
 }
 
 void XWindowSwitcher::ActivateWindowAction::activate() {
     if(display != NULL) {
+
+        if(validDesktopId) {
+            client_msg(DefaultRootWindow(display), "_NET_CURRENT_DESKTOP", desktopId, 0, 0, 0, 0);
+        }
+
         char netActiveWindow[] = "_NET_ACTIVE_WINDOW";
-        client_msg(netActiveWindow);
+        client_msg(window, netActiveWindow, 0, 0, 0, 0, 0);
         XMapRaised(display, window);
         XSetInputFocus(display, window, RevertToNone, CurrentTime);
         XSync(display, false);
     }
 }
 
-void XWindowSwitcher::ActivateWindowAction::client_msg(char *msg) {
+void XWindowSwitcher::ActivateWindowAction::client_msg(Window win, char *msg,
+        unsigned long data0, unsigned long data1, 
+        unsigned long data2, unsigned long data3,
+        unsigned long data4) {
     XEvent event;
     long mask = SubstructureRedirectMask | SubstructureNotifyMask;
 
@@ -432,13 +448,13 @@ void XWindowSwitcher::ActivateWindowAction::client_msg(char *msg) {
     event.xclient.serial = 0;
     event.xclient.send_event = True;
     event.xclient.message_type = XInternAtom(display, msg, False);
-    event.xclient.window = window;
+    event.xclient.window = win;
     event.xclient.format = 32;
-    event.xclient.data.l[0] = 0;
-    event.xclient.data.l[1] = 0;
-    event.xclient.data.l[2] = 0;
-    event.xclient.data.l[3] = 0;
-    event.xclient.data.l[4] = 0;
+    event.xclient.data.l[0] = data0;
+    event.xclient.data.l[1] = data1;
+    event.xclient.data.l[2] = data2;
+    event.xclient.data.l[3] = data3;
+    event.xclient.data.l[4] = data4;
 
     XSendEvent(display, DefaultRootWindow(display), False, mask, &event);
 }
