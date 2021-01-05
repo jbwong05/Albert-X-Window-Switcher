@@ -19,9 +19,11 @@ class XWindowSwitcher::Private {
     public:
         QPointer<ConfigWidget> widget;
         Display *display;
-        QMap<QString, QString> iconPaths;
+        QMap<QString, QString> iconPathCache;
         QMap<QString, QString> index;
         QString fallbackIconPath;
+
+        QMap<Window, QString> applicationNameCache;
 
         QFileSystemWatcher watcher;
         QFutureWatcher<QMap<QString, QString>> futureWatcher;
@@ -53,9 +55,9 @@ void XWindowSwitcher::Private::finishIndexing() {
     index = futureWatcher.future().result();
 
     // Rebuild
-    iconPaths.clear();
+    iconPathCache.clear();
     for(auto key : index.keys()) {
-        iconPaths.insert(key, index.value(key));
+        iconPathCache.insert(key, index.value(key));
     }
 
     // Finally update the watches (maybe folders changed)
@@ -218,6 +220,23 @@ XWindowSwitcher::Extension::Extension() : Core::Extension("org.albert.extension.
 
     } else {
 
+        Window *clientList;
+        unsigned long clientListSize;
+
+        if((clientList = getClientList(d->display, &clientListSize)) == NULL) {
+            qDebug() << "No windows found";
+
+        } else {
+
+            clientListSize /= sizeof(Window);
+            for(long unsigned int i = 0; i < clientListSize; i++) {
+                XClassHint classHint;
+                XGetClassHint(d->display, clientList[i], &classHint);
+                QString applicationName(classHint.res_name);
+                d->applicationNameCache.insert(clientList[i], applicationName);
+            }
+        }
+
         // If the filesystem changed, trigger the scan
         connect(&d->watcher, &QFileSystemWatcher::directoryChanged, std::bind(&Private::startIndexing, d.get()));
         d->startIndexing();
@@ -287,24 +306,31 @@ void XWindowSwitcher::Extension::handleQuery(Core::Query *query) const {
                 windowTitle = "";
             }
 
-            XClassHint classHint;
-            XGetClassHint(d->display, clientList[i], &classHint);
-            QString applicationName(classHint.res_name);
+            QString applicationName;
+            if(d->applicationNameCache.contains(clientList[i])) {
+                applicationName = d->applicationNameCache[clientList[i]];
+            } else {
+                XClassHint classHint;
+                XGetClassHint(d->display, clientList[i], &classHint);
+                applicationName = classHint.res_name;
+                d->applicationNameCache.insert(clientList[i], applicationName);
+            }
+
             if(applicationName.toLower().contains(query->string().toLower()) || windowTitle.toLower().contains(query->string().toLower())) {
                 auto item = make_shared<StandardItem>(applicationName);
                 item->setText("Switch Windows");
                 item->setSubtext(windowTitle);
 
                 QString iconPath;
-                if(d->iconPaths.contains(applicationName.toLower())) {
-                    iconPath = d->iconPaths[applicationName];
+                if(d->iconPathCache.contains(applicationName.toLower())) {
+                    iconPath = d->iconPathCache[applicationName];
                 } else {
                     iconPath = XDG::IconLookup::iconPath(applicationName);
 
                     if(iconPath.isEmpty()) {
-                        d->iconPaths.insert(applicationName.toLower(), d->fallbackIconPath);
+                        d->iconPathCache.insert(applicationName.toLower(), d->fallbackIconPath);
                     } else {
-                        d->iconPaths.insert(applicationName.toLower(), iconPath);
+                        d->iconPathCache.insert(applicationName.toLower(), iconPath);
                     }
                 }
 
