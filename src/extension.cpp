@@ -290,7 +290,7 @@ void XWindowSwitcher::Extension::handleQuery(Core::Query *query) const {
             XClassHint classHint;
             XGetClassHint(d->display, clientList[i], &classHint);
             QString applicationName(classHint.res_name);
-            if(applicationName.contains(query->string()) || windowTitle.contains(query->string())) {
+            if(applicationName.toLower().contains(query->string().toLower()) || windowTitle.toLower().contains(query->string().toLower())) {
                 auto item = make_shared<StandardItem>(applicationName);
                 item->setText("Switch Windows");
                 item->setSubtext(windowTitle);
