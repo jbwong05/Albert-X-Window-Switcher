@@ -26,7 +26,7 @@ namespace XWindowSwitcher {
             Extension();
             ~Extension() override;
 
-            QString name() const override { return "Template"; }
+            QString name() const override { return "X Window Switcher"; }
             QWidget *widget(QWidget *parent = nullptr) override;
             void setupSession() override;
             void teardownSession() override;
