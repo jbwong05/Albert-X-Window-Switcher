@@ -414,7 +414,7 @@ XWindowSwitcher::ActivateWindowAction::ActivateWindowAction(const QString &text,
 
 }
 
-void XWindowSwitcher::ActivateWindowAction::activate() {
+void XWindowSwitcher::ActivateWindowAction::activate() const {
     if(display != NULL) {
         char netActiveWindow[] = "_NET_ACTIVE_WINDOW";
         client_msg(netActiveWindow);
@@ -424,7 +424,7 @@ void XWindowSwitcher::ActivateWindowAction::activate() {
     }
 }
 
-void XWindowSwitcher::ActivateWindowAction::client_msg(char *msg) {
+void XWindowSwitcher::ActivateWindowAction::client_msg(char *msg) const {
     XEvent event;
     long mask = SubstructureRedirectMask | SubstructureNotifyMask;
 

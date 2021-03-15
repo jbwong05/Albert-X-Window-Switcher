@@ -43,12 +43,12 @@ namespace XWindowSwitcher {
     struct ActivateWindowAction : public Core::StandardActionBase {
         public:
             ActivateWindowAction(const QString &text, Display *display, Window window);
-            void activate() override;
+            void activate() const override;
 
         private:
             Display *display;
             Window window;
             
-            void client_msg(char *msg);
+            void client_msg(char *msg) const;
     };
 }
