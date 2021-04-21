@@ -109,6 +109,7 @@ QMap<QString, QString> XWindowSwitcher::Private::indexApplications() const {
         QString executable;
         QString iconPath;
         QString startupWMClass;
+        QStringList nameTokens;
         bool desktopEntry = false;
         bool applicationType = false;
         bool noDisplay = false;
@@ -155,6 +156,11 @@ QMap<QString, QString> XWindowSwitcher::Private::indexApplications() const {
                     if(index != -1) {
                         startupWMClass = line.mid(index + 1);
                     }
+                } else if(nameTokens.isEmpty() && line.startsWith("Name") && !line.contains('[') && !line.contains(']')) {
+                    int index = line.indexOf("=");
+                    if(index != -1) {
+                        nameTokens = QString(line.mid(index + 1)).toLower().split(" ");
+                    }
                 }
             }
             file.close();
@@ -198,6 +204,12 @@ QMap<QString, QString> XWindowSwitcher::Private::indexApplications() const {
 
             if(!executable.isEmpty() && !iconPath.isEmpty()) {
                 retrievedIconPaths.insert(executable, iconPath);
+
+                for(QString nameToken : nameTokens) {
+                    if(!retrievedIconPaths.contains(nameToken)) {
+                        retrievedIconPaths.insert(nameToken, iconPath);
+                    }
+                }
             }
         }
     }
@@ -297,9 +309,13 @@ void XWindowSwitcher::Extension::handleQuery(Core::Query *query) const {
 
                 QString iconPath;
                 if(d->iconPaths.contains(applicationName.toLower())) {
-                    iconPath = d->iconPaths[applicationName];
+                    iconPath = d->iconPaths[applicationName.toLower()];
                 } else {
                     iconPath = XDG::IconLookup::iconPath(applicationName);
+
+                    if(iconPath.isEmpty()) {
+                        iconPath = XDG::IconLookup::iconPath(applicationName.toLower());
+                    }
 
                     if(iconPath.isEmpty()) {
                         d->iconPaths.insert(applicationName.toLower(), d->fallbackIconPath);
