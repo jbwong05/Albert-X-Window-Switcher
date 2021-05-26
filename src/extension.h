@@ -1,4 +1,5 @@
 #pragma once
+#include "qtextstream.h"
 #include <QObject>
 #include <memory>
 #include "albert/extension.h"
